@@ -12,10 +12,12 @@ import (
 
 var sendTo string
 var extraHeaders bool
+var preserveHost bool
 
 func init() {
 	transmitterCmd.Flags().StringVarP(&sendTo, "send-to", "", "http://localhost:8000", "URI to send webhooks to")
 	transmitterCmd.Flags().BoolVarP(&extraHeaders, "extra-headers", "", true, "Send extra headers to the webhook host")
+	transmitterCmd.Flags().BoolVarP(&preserveHost, "preserve-host", "", false, "Preserve the original host header in the request")
 	rootCmd.AddCommand(transmitterCmd)
 }
 
@@ -33,12 +35,14 @@ var transmitterCmd = &cobra.Command{
 		client := &http.Client{}
 
 		for msg := range msgs {
+			// TODO Subscriber should unmarshal the message
 			var reqmsg messaging.RequestMessage
 			err = json.Unmarshal(msg.Body, &reqmsg)
 			if err != nil {
 				log.Panicf("Failed to unmarshal message: %s", err)
 			}
 
+			// TODO This should be a method on RequestMessage
 			req, err := http.NewRequest(reqmsg.Method, sendTo, nil)
 			if err != nil {
 				log.Panicf("Failed to create request: %s", err)
@@ -50,6 +54,14 @@ var transmitterCmd = &cobra.Command{
 
 			if extraHeaders {
 				req.Header.Set("Relay-Original-Path", reqmsg.Path)
+			}
+
+			if extraHeaders {
+				req.Header["Relay-Original-Host"] = []string{reqmsg.Host}
+			}
+
+			if preserveHost {
+				req.Host = reqmsg.Host
 			}
 
 			buf := bytes.NewBuffer([]byte(reqmsg.Body))

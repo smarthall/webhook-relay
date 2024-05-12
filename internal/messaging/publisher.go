@@ -57,8 +57,10 @@ func (p *Publisher) Publish(request http.Request) error {
 		return err
 	}
 
+	// TODO This should be a method on RequestMessage
 	msg := RequestMessage{
 		Method:  request.Method,
+		Host:    request.Host,
 		Path:    request.URL.Path,
 		Headers: request.Header,
 		Body:    string(body),
