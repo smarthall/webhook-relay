@@ -9,7 +9,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var listenAddr string
+
 func init() {
+	receiverCmd.Flags().StringVarP(&listenAddr, "listen", "", ":8080", "Address to listen on")
 	rootCmd.AddCommand(receiverCmd)
 }
 
@@ -21,7 +24,7 @@ var receiverCmd = &cobra.Command{
 		var pub = messaging.NewPublisher(amqpURI)
 
 		s := &http.Server{
-			Addr: ":8080",
+			Addr: listenAddr,
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Publish the request to the message broker
 				err := pub.Publish(*r)
