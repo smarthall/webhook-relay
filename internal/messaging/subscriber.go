@@ -12,8 +12,8 @@ type Subscriber struct {
 	q    amqp.Queue
 }
 
-func NewSubscriber() *Subscriber {
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+func NewSubscriber(amqpUri string) *Subscriber {
+	conn, err := amqp.Dial(amqpUri)
 	if err != nil {
 		log.Panicf("Failed to connect to RabbitMQ: %s", err)
 

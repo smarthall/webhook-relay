@@ -16,10 +16,10 @@ type Publisher struct {
 	ch   *amqp.Channel
 }
 
-func NewPublisher() *Publisher {
+func NewPublisher(amqpUri string) *Publisher {
 	var err error
 
-	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	conn, err := amqp.Dial(amqpUri)
 	if err != nil {
 		log.Panicf("Failed to connect to RabbitMQ: %s", err)
 	}

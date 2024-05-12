@@ -18,7 +18,7 @@ var receiverCmd = &cobra.Command{
 	Short: "Receives webhooks and forwards them to RabbitMQ",
 	Long:  `Receiver listens for incoming webhooks and forwards them to a RabbitMQ exchange.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var pub = messaging.NewPublisher()
+		var pub = messaging.NewPublisher(amqpURI)
 
 		s := &http.Server{
 			Addr: ":8080",

@@ -18,7 +18,7 @@ var transmitterCmd = &cobra.Command{
 	Short: "Transmitter listens to RabbitMQ and sends webhooks to a host",
 	Long:  `Transmitter listens to RabbitMQ and sends webhooks to a host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		sub := messaging.NewSubscriber()
+		sub := messaging.NewSubscriber(amqpURI)
 		msgs, err := sub.Subscribe()
 		if err != nil {
 			log.Panicf("Failed to consume messages: %s", err)
