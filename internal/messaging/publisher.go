@@ -1,4 +1,4 @@
-package publisher
+package messaging
 
 import (
 	"context"
@@ -14,7 +14,7 @@ type Publisher struct {
 	ch   *amqp.Channel
 }
 
-func New() *Publisher {
+func NewPublisher() *Publisher {
 	var err error
 
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")

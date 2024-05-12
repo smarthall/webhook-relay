@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/smarthall/webhook-relay/internal/publisher"
+	"github.com/smarthall/webhook-relay/internal/messaging"
 )
 
-var pub = publisher.New()
+var pub = messaging.NewPublisher()
 
 func myHandler(w http.ResponseWriter, r *http.Request) {
 	err := pub.Publish(*r)
