@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -9,7 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var sendTo string
+var extraHeaders bool
+
 func init() {
+	transmitterCmd.Flags().StringVarP(&sendTo, "send-to", "", "http://localhost:8000", "URI to send webhooks to")
+	transmitterCmd.Flags().BoolVarP(&extraHeaders, "extra-headers", "", true, "Send extra headers to the webhook host")
 	rootCmd.AddCommand(transmitterCmd)
 }
 
@@ -27,15 +33,13 @@ var transmitterCmd = &cobra.Command{
 		client := &http.Client{}
 
 		for msg := range msgs {
-			log.Printf("Received message! %s", msg.Body)
-
 			var reqmsg messaging.RequestMessage
 			err = json.Unmarshal(msg.Body, &reqmsg)
 			if err != nil {
 				log.Panicf("Failed to unmarshal message: %s", err)
 			}
 
-			req, err := http.NewRequest(reqmsg.Method, "http://localhost:8000"+reqmsg.Path, nil)
+			req, err := http.NewRequest(reqmsg.Method, sendTo, nil)
 			if err != nil {
 				log.Panicf("Failed to create request: %s", err)
 			}
@@ -43,6 +47,13 @@ var transmitterCmd = &cobra.Command{
 			for k, v := range reqmsg.Headers {
 				req.Header[k] = v
 			}
+
+			if extraHeaders {
+				req.Header.Set("Relay-Original-Path", reqmsg.Path)
+			}
+
+			buf := bytes.NewBuffer([]byte(reqmsg.Body))
+			req.Write(buf)
 
 			client.Do(req)
 		}
