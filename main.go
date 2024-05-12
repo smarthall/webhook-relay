@@ -4,10 +4,19 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/smarthall/webhook-relay/internal/publisher"
 )
 
+var pub = publisher.New()
+
 func myHandler(w http.ResponseWriter, r *http.Request) {
-	log.Print("Received request")
+	err := pub.Publish(*r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
