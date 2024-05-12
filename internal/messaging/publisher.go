@@ -2,6 +2,8 @@ package messaging
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -50,14 +52,31 @@ func (p *Publisher) Publish(request http.Request) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := p.ch.PublishWithContext(ctx,
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		return err
+	}
+
+	msg := RequestMessage{
+		Method:  request.Method,
+		Path:    request.URL.Path,
+		Headers: request.Header,
+		Body:    string(body),
+	}
+
+	json, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	err = p.ch.PublishWithContext(ctx,
 		"webhooks", // exchange
 		"test",     // routing key
 		false,      // mandatory
 		false,      // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
-			Body:        []byte("Hello World!"),
+			Body:        json,
 		})
 
 	return err

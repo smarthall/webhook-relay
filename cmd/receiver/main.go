@@ -11,12 +11,14 @@ import (
 var pub = messaging.NewPublisher()
 
 func myHandler(w http.ResponseWriter, r *http.Request) {
+	// Publish the request to the message broker
 	err := pub.Publish(*r)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	// If the message was published successfully, return a 204 No Content response
 	w.WriteHeader(http.StatusNoContent)
 }
 
