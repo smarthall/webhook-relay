@@ -42,5 +42,7 @@ var receiverCmd = &cobra.Command{
 			MaxHeaderBytes: 1 << 20,
 		}
 		log.Fatal(s.ListenAndServe())
+
+		// TODO: Implement a signal handler to gracefully shutdown the server
 	},
 }

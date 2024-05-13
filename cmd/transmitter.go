@@ -73,5 +73,7 @@ var transmitterCmd = &cobra.Command{
 
 			client.Do(req)
 		}
+
+		// TODO: Implement a signal handler to gracefully shutdown the server
 	},
 }
