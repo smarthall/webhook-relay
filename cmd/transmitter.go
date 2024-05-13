@@ -46,6 +46,7 @@ var transmitterCmd = &cobra.Command{
 			}
 
 			// TODO This should be a method on RequestMessage
+			// TODO: Replace send-to with something compatible with environment variables
 			req, err := http.NewRequest(reqmsg.Method, viper.GetString("send-to"), nil)
 			if err != nil {
 				log.Panicf("Failed to create request: %s", err)
