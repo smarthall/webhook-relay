@@ -5,13 +5,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-var amqpURI string
-
-func init() {
-	rootCmd.PersistentFlags().StringVar(&amqpURI, "amqp", "amqp://guest:guest@localhost:5672/", "AMQP URI for RabbitMQ")
-}
+var cfgFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "relay",
@@ -21,14 +18,38 @@ var rootCmd = &cobra.Command{
 				forwards them to a RabbitMQ exchange. It also listens for
 				messages from RabbitMQ and sends them to a webhook. This
 				allows for many services to receive a single webhook.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Do Stuff Here
-	},
+}
+
+func init() {
+	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().String("amqp", "amqp://guest:guest@localhost:5672/", "AMQP URI for RabbitMQ")
+	viper.BindPFlag("amqp", rootCmd.PersistentFlags().Lookup("amqp"))
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $PWD/config.yaml)")
+
+	rootCmd.PersistentFlags().Lookup("config")
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+}
+
+func initConfig() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.AddConfigPath(".")
+		viper.SetConfigType("yaml")
+		viper.SetConfigName("config")
+	}
+
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err == nil {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }

@@ -7,12 +7,13 @@ import (
 
 	"github.com/smarthall/webhook-relay/internal/messaging"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-var listenAddr string
-
 func init() {
-	receiverCmd.Flags().StringVarP(&listenAddr, "listen", "", ":8080", "Address to listen on")
+	receiverCmd.Flags().String("listen", ":8080", "Address to listen on")
+	viper.BindPFlag("listen", receiverCmd.Flags().Lookup("listen"))
+
 	rootCmd.AddCommand(receiverCmd)
 }
 
@@ -21,10 +22,10 @@ var receiverCmd = &cobra.Command{
 	Short: "Receives webhooks and forwards them to RabbitMQ",
 	Long:  `Receiver listens for incoming webhooks and forwards them to a RabbitMQ exchange.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var pub = messaging.NewPublisher(amqpURI)
+		var pub = messaging.NewPublisher(viper.GetString("amqp"))
 
 		s := &http.Server{
-			Addr: listenAddr,
+			Addr: viper.GetString("listen"),
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Publish the request to the message broker
 				err := pub.Publish(*r)
