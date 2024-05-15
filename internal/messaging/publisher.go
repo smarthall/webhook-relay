@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -71,9 +72,10 @@ func (p *Publisher) Publish(request http.Request) error {
 		return err
 	}
 
+	routingKey := strings.Trim(strings.Replace(request.URL.Path, "/", ".", -1), ".")
 	err = p.ch.PublishWithContext(ctx,
 		"webhooks", // exchange
-		"test",     // routing key
+		routingKey, // routing key
 		false,      // mandatory
 		false,      // immediate
 		amqp.Publishing{
