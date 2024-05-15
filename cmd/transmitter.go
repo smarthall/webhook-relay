@@ -12,6 +12,9 @@ import (
 )
 
 func init() {
+	transmitterCmd.Flags().String("key", "#", "The key to subscribe to")
+	viper.BindPFlag("key", transmitterCmd.Flags().Lookup("key"))
+
 	transmitterCmd.Flags().String("send-to", "http://localhost:8000", "URI to send webhooks to")
 	viper.BindPFlag("send-to", transmitterCmd.Flags().Lookup("send-to"))
 
@@ -29,7 +32,7 @@ var transmitterCmd = &cobra.Command{
 	Short: "Transmitter listens to RabbitMQ and sends webhooks to a host",
 	Long:  `Transmitter listens to RabbitMQ and sends webhooks to a host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		sub := messaging.NewSubscriber(viper.GetString("amqp"))
+		sub := messaging.NewSubscriber(viper.GetString("amqp"), viper.GetString("key"))
 		msgs, err := sub.Subscribe()
 		if err != nil {
 			log.Panicf("Failed to consume messages: %s", err)

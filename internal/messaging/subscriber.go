@@ -12,7 +12,7 @@ type Subscriber struct {
 	q    amqp.Queue
 }
 
-func NewSubscriber(amqpUri string) *Subscriber {
+func NewSubscriber(amqpUri string, key string) *Subscriber {
 	conn, err := amqp.Dial(amqpUri)
 	if err != nil {
 		log.Panicf("Failed to connect to RabbitMQ: %s", err)
@@ -50,7 +50,7 @@ func NewSubscriber(amqpUri string) *Subscriber {
 		log.Panicf("Failed to declare queue: %s", err)
 	}
 
-	err = ch.QueueBind(q.Name, "#", "webhooks", false, nil)
+	err = ch.QueueBind(q.Name, key, "webhooks", false, nil)
 	if err != nil {
 		log.Panicf("Failed to bind queue: %s", err)
 	}
