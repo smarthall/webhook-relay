@@ -57,7 +57,8 @@ var transmitterCmd = &cobra.Command{
 
 			// TODO This should be a method on RequestMessage
 			// TODO: Replace send-to with something compatible with environment variables
-			req, err := http.NewRequest(reqmsg.Method, viper.GetString("send-to"), nil)
+			buf := bytes.NewBuffer([]byte(reqmsg.Body))
+			req, err := http.NewRequest(reqmsg.Method, viper.GetString("send-to"), buf)
 			if err != nil {
 				log.Panicf("Failed to create request: %s", err)
 			}
@@ -77,9 +78,6 @@ var transmitterCmd = &cobra.Command{
 			if viper.GetBool("preserve-host") {
 				req.Host = reqmsg.Host
 			}
-
-			buf := bytes.NewBuffer([]byte(reqmsg.Body))
-			req.Write(buf)
 
 			log.Printf("Sending request to: %s", req.URL.String())
 			response, err := client.Do(req)
