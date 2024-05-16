@@ -27,6 +27,8 @@ var receiverCmd = &cobra.Command{
 		s := &http.Server{
 			Addr: viper.GetString("listen"),
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				log.Printf("Received request at: %s", r.URL.Path)
+
 				// Publish the request to the message broker
 				err := pub.Publish(*r)
 				if err != nil {

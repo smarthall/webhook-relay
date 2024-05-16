@@ -74,7 +74,9 @@ var transmitterCmd = &cobra.Command{
 			buf := bytes.NewBuffer([]byte(reqmsg.Body))
 			req.Write(buf)
 
-			client.Do(req)
+			log.Printf("Sending request to: %s", req.URL.String())
+			response, _ := client.Do(req)
+			log.Printf("Received response: %s", response.Status)
 		}
 
 		// TODO: Implement a signal handler to gracefully shutdown the server

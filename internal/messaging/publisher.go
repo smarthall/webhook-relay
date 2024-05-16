@@ -24,6 +24,7 @@ func NewPublisher(amqpUri string) *Publisher {
 	if err != nil {
 		log.Panicf("Failed to connect to RabbitMQ: %s", err)
 	}
+	log.Printf("Connected to RabbitMQ at %s", amqpUri)
 
 	ch, err := conn.Channel()
 	if err != nil {
@@ -79,9 +80,10 @@ func (p *Publisher) Publish(request http.Request) error {
 		false,      // mandatory
 		false,      // immediate
 		amqp.Publishing{
-			ContentType: "text/plain",
+			ContentType: "application/json",
 			Body:        json,
 		})
+	log.Printf("Published message to %s", routingKey)
 
 	return err
 }

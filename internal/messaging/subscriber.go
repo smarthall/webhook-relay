@@ -18,6 +18,7 @@ func NewSubscriber(amqpUri string, key string) *Subscriber {
 		log.Panicf("Failed to connect to RabbitMQ: %s", err)
 
 	}
+	log.Printf("Connected to RabbitMQ at %s", amqpUri)
 
 	ch, err := conn.Channel()
 	if err != nil {
@@ -49,6 +50,7 @@ func NewSubscriber(amqpUri string, key string) *Subscriber {
 	if err != nil {
 		log.Panicf("Failed to declare queue: %s", err)
 	}
+	log.Printf("Declared queue %s", q.Name)
 
 	err = ch.QueueBind(q.Name, key, "webhooks", false, nil)
 	if err != nil {
