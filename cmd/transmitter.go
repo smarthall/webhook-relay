@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -17,6 +18,9 @@ func init() {
 
 	transmitterCmd.Flags().String("send-to", "http://localhost:8000", "URI to send webhooks to")
 	viper.BindPFlag("send-to", transmitterCmd.Flags().Lookup("send-to"))
+
+	transmitterCmd.Flags().Bool("insecure", false, "Skip SSL verification")
+	viper.BindPFlag("insecure", transmitterCmd.Flags().Lookup("insecure"))
 
 	transmitterCmd.Flags().Bool("extra-headers", true, "Send extra headers to the webhook host")
 	viper.BindPFlag("extra-headers", transmitterCmd.Flags().Lookup("extra-headers"))
@@ -38,7 +42,10 @@ var transmitterCmd = &cobra.Command{
 			log.Panicf("Failed to consume messages: %s", err)
 		}
 
-		client := &http.Client{}
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: viper.GetBool("insecure")},
+		}
+		client := &http.Client{Transport: tr}
 
 		for msg := range msgs {
 			// TODO Subscriber should unmarshal the message
