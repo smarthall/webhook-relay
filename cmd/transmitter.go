@@ -75,7 +75,11 @@ var transmitterCmd = &cobra.Command{
 			req.Write(buf)
 
 			log.Printf("Sending request to: %s", req.URL.String())
-			response, _ := client.Do(req)
+			response, err := client.Do(req)
+			if err != nil {
+				log.Printf("Failed to send request: %s", err)
+				continue
+			}
 			log.Printf("Received response: %s", response.Status)
 		}
 
