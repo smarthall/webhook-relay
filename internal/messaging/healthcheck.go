@@ -13,10 +13,9 @@ import (
 // heartbeat is not observed within the configured timeout, a notification is sent
 // on the Failure channel.
 type HealthChecker struct {
-	amqpUri    string
-	instanceID string
-	Interval   time.Duration
-	Timeout    time.Duration
+	amqpUri  string
+	Interval time.Duration
+	Timeout  time.Duration
 
 	Failure chan struct{}
 
@@ -27,14 +26,13 @@ type HealthChecker struct {
 	stop chan struct{}
 }
 
-func NewHealthChecker(amqpUri, instanceID string, interval, timeout time.Duration) *HealthChecker {
+func NewHealthChecker(amqpUri string, interval, timeout time.Duration) *HealthChecker {
 	h := &HealthChecker{
-		amqpUri:    amqpUri,
-		instanceID: instanceID,
-		Interval:   interval,
-		Timeout:    timeout,
-		Failure:    make(chan struct{}, 1),
-		stop:       make(chan struct{}),
+		amqpUri:  amqpUri,
+		Interval: interval,
+		Timeout:  timeout,
+		Failure:  make(chan struct{}, 1),
+		stop:     make(chan struct{}),
 	}
 
 	// start the health checker asynchronously
