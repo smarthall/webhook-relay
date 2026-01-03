@@ -13,17 +13,18 @@ type Subscriber struct {
 }
 
 func NewSubscriber(amqpUri string, key string) *Subscriber {
-	conn, err := amqp.Dial(amqpUri)
-	if err != nil {
-		log.Panicf("Failed to connect to RabbitMQ: %s", err)
-
+	if err := InitConnections(amqpUri); err != nil {
+		log.Panicf("Failed to initialize RabbitMQ connections: %s", err)
 	}
-	log.Printf("Connected to RabbitMQ at %s", amqpUri)
+
+	conn := GetSubConn()
+	if conn == nil {
+		log.Panicf("subscriber connection is nil")
+	}
 
 	ch, err := conn.Channel()
 	if err != nil {
 		log.Panicf("Failed to open a channel: %s", err)
-
 	}
 
 	err = ch.ExchangeDeclare(

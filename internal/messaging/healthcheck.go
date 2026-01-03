@@ -18,10 +18,8 @@ type HealthChecker struct {
 	Timeout  time.Duration
 
 	Failure chan struct{}
-
-	conn  *amqp.Connection
-	chPub *amqp.Channel
-	chSub *amqp.Channel
+	chPub   *amqp.Channel
+	chSub   *amqp.Channel
 
 	stop chan struct{}
 }
@@ -49,25 +47,30 @@ func NewHealthChecker(amqpUri string, interval, timeout time.Duration) *HealthCh
 // It returns an error only if initial setup (publisher/subscriber) fails.
 // This method is intentionally unexported because health checking starts automatically.
 func (h *HealthChecker) start() error {
-	// dial
-	conn, err := amqp.Dial(h.amqpUri)
-	if err != nil {
+	// ensure pooled connections are initialized
+	if err := InitConnections(h.amqpUri); err != nil {
 		return err
 	}
-	h.conn = conn
 
-	// create separate channels for publishing and subscribing
-	chPub, err := conn.Channel()
+	// create separate channels for publishing and subscribing from pooled connections
+	pubConn := GetPubConn()
+	if pubConn == nil {
+		return amqp.ErrClosed
+	}
+	chPub, err := pubConn.Channel()
 	if err != nil {
-		h.conn.Close()
 		return err
 	}
 	h.chPub = chPub
 
-	chSub, err := conn.Channel()
+	subConn := GetSubConn()
+	if subConn == nil {
+		_ = h.chPub.Close()
+		return amqp.ErrClosed
+	}
+	chSub, err := subConn.Channel()
 	if err != nil {
-		h.chPub.Close()
-		h.conn.Close()
+		_ = h.chPub.Close()
 		return err
 	}
 	h.chSub = chSub
@@ -167,9 +170,5 @@ func (h *HealthChecker) Stop() {
 	if h.chPub != nil {
 		_ = h.chPub.Close()
 		h.chPub = nil
-	}
-	if h.conn != nil {
-		_ = h.conn.Close()
-		h.conn = nil
 	}
 }

@@ -19,12 +19,15 @@ type Publisher struct {
 
 func NewPublisher(amqpUri string) *Publisher {
 	var err error
-
-	conn, err := amqp.Dial(amqpUri)
-	if err != nil {
-		log.Panicf("Failed to connect to RabbitMQ: %s", err)
+	// ensure pooled connections are initialized
+	if err = InitConnections(amqpUri); err != nil {
+		log.Panicf("Failed to initialize RabbitMQ connections: %s", err)
 	}
-	log.Printf("Connected to RabbitMQ at %s", amqpUri)
+
+	conn := GetPubConn()
+	if conn == nil {
+		log.Panicf("publisher connection is nil")
+	}
 
 	ch, err := conn.Channel()
 	if err != nil {
