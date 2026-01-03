@@ -2,11 +2,16 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/smarthall/webhook-relay/internal/messaging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,6 +36,42 @@ func init() {
 	rootCmd.AddCommand(transmitterCmd)
 }
 
+// processDelivery handles a single AMQP delivery: it unmarshals the message and
+// sends the contained HTTP request to the destination host.
+func processDelivery(msg amqp.Delivery, client *http.Client, sendTo string, extraHeaders bool, preserveHost bool) error {
+	var reqmsg messaging.RequestMessage
+	if err := json.Unmarshal(msg.Body, &reqmsg); err != nil {
+		return fmt.Errorf("failed to unmarshal message: %w", err)
+	}
+
+	buf := bytes.NewBuffer([]byte(reqmsg.Body))
+	req, err := http.NewRequest(reqmsg.Method, sendTo, buf)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	for k, v := range reqmsg.Headers {
+		req.Header[k] = v
+	}
+
+	if extraHeaders {
+		req.Header.Set("Relay-Original-Path", reqmsg.Path)
+		req.Header["Relay-Original-Host"] = []string{reqmsg.Host}
+	}
+
+	if preserveHost {
+		req.Host = reqmsg.Host
+	}
+
+	log.Printf("Sending request to: %s", req.URL.String())
+	response, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	log.Printf("Received response: %s", response.Status)
+	return nil
+}
+
 var transmitterCmd = &cobra.Command{
 	Use:   "transmitter",
 	Short: "Transmitter listens to RabbitMQ and sends webhooks to a host",
@@ -47,47 +88,26 @@ var transmitterCmd = &cobra.Command{
 		}
 		client := &http.Client{Transport: tr}
 
-		for msg := range msgs {
-			// TODO Subscriber should unmarshal the message
-			var reqmsg messaging.RequestMessage
-			err = json.Unmarshal(msg.Body, &reqmsg)
-			if err != nil {
-				log.Panicf("Failed to unmarshal message: %s", err)
-			}
+		// Create a context that cancels on SIGINT or SIGTERM
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
 
-			// TODO This should be a method on RequestMessage
-			// TODO: Replace send-to with something compatible with environment variables
-			buf := bytes.NewBuffer([]byte(reqmsg.Body))
-			req, err := http.NewRequest(reqmsg.Method, viper.GetString("send-to"), buf)
-			if err != nil {
-				log.Panicf("Failed to create request: %s", err)
+		// Process messages until the channel closes or we receive a shutdown signal
+		for {
+			select {
+			case <-ctx.Done():
+				log.Printf("shutdown signal received, stopping transmitter")
+				return
+			case msg, ok := <-msgs:
+				if !ok {
+					log.Printf("message channel closed, exiting")
+					return
+				}
+				if err := processDelivery(msg, client, viper.GetString("send-to"), viper.GetBool("extra-headers"), viper.GetBool("preserve-host")); err != nil {
+					log.Printf("Failed to process message: %v", err)
+					continue
+				}
 			}
-
-			for k, v := range reqmsg.Headers {
-				req.Header[k] = v
-			}
-
-			if viper.GetBool("extra-headers") {
-				req.Header.Set("Relay-Original-Path", reqmsg.Path)
-			}
-
-			if viper.GetBool("extra-headers") {
-				req.Header["Relay-Original-Host"] = []string{reqmsg.Host}
-			}
-
-			if viper.GetBool("preserve-host") {
-				req.Host = reqmsg.Host
-			}
-
-			log.Printf("Sending request to: %s", req.URL.String())
-			response, err := client.Do(req)
-			if err != nil {
-				log.Printf("Failed to send request: %s", err)
-				continue
-			}
-			log.Printf("Received response: %s", response.Status)
 		}
-
-		// TODO: Implement a signal handler to gracefully shutdown the server
 	},
 }
