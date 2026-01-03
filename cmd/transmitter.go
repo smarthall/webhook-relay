@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/smarthall/webhook-relay/internal/messaging"
@@ -92,11 +94,29 @@ var transmitterCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
 
+		// Create and start a health checker for this instance. If the
+		// health checker signals failure the process will gracefully shut down.
+		instanceID := viper.GetString("instance_id")
+		if instanceID == "" {
+			if hn, err := os.Hostname(); err == nil {
+				instanceID = hn
+			} else {
+				instanceID = "transmitter"
+			}
+		}
+
+		hc := messaging.NewHealthChecker(viper.GetString("amqp"), instanceID, 5*time.Second, 10*time.Second)
+		defer hc.Stop()
+
 		// Process messages until the channel closes or we receive a shutdown signal
 		for {
 			select {
 			case <-ctx.Done():
 				log.Printf("shutdown signal received, stopping transmitter")
+				return
+			case <-hc.Failure:
+				log.Printf("healthcheck failure detected, initiating shutdown")
+				stop()
 				return
 			case msg, ok := <-msgs:
 				if !ok {

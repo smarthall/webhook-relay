@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -27,6 +28,20 @@ var receiverCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		pub := messaging.NewPublisher(viper.GetString("amqp"))
 
+		// Create and start a health checker for this instance. If the
+		// health checker signals failure the process will gracefully shut down.
+		instanceID := viper.GetString("instance_id")
+		if instanceID == "" {
+			if hn, err := os.Hostname(); err == nil {
+				instanceID = hn
+			} else {
+				instanceID = "receiver"
+			}
+		}
+
+		hc := messaging.NewHealthChecker(viper.GetString("amqp"), instanceID, 1*time.Second, 2*time.Second)
+		defer hc.Stop()
+
 		// Create a context that is cancelled on SIGINT or SIGTERM
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
@@ -44,6 +59,17 @@ var receiverCmd = &cobra.Command{
 			log.Printf("starting server on %s", s.Addr)
 			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Fatalf("server error: %v", err)
+			}
+		}()
+
+		// Monitor healthcheck failures and trigger shutdown when they occur.
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hc.Failure:
+				log.Printf("healthcheck failure detected, initiating shutdown")
+				stop()
 			}
 		}()
 
