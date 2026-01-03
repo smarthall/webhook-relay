@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/smarthall/webhook-relay/internal/messaging"
@@ -22,29 +25,71 @@ var receiverCmd = &cobra.Command{
 	Short: "Receives webhooks and forwards them to RabbitMQ",
 	Long:  `Receiver listens for incoming webhooks and forwards them to a RabbitMQ exchange.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var pub = messaging.NewPublisher(viper.GetString("amqp"))
+		pub := messaging.NewPublisher(viper.GetString("amqp"))
+
+		// Create and start a health checker. If the health checker signals
+		// failure the process will gracefully shut down.
+		hc := messaging.NewHealthChecker(viper.GetString("amqp"), 1*time.Second, 2*time.Second)
+		defer hc.Stop()
+
+		// Create a context that is cancelled on SIGINT or SIGTERM
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
 
 		s := &http.Server{
-			Addr: viper.GetString("listen"),
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				log.Printf("Received request at: %s", r.URL.Path)
-
-				// Publish the request to the message broker
-				err := pub.Publish(*r)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				// If the message was published successfully, return a 204 No Content response
-				w.WriteHeader(http.StatusNoContent)
-			}),
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
+			Addr:           viper.GetString("listen"),
+			Handler:        requestHandler(pub),
+			ReadTimeout:    2 * time.Second,
+			WriteTimeout:   2 * time.Second,
 			MaxHeaderBytes: 1 << 20,
 		}
-		log.Fatal(s.ListenAndServe())
 
-		// TODO: Implement a signal handler to gracefully shutdown the server
+		// Start server in a goroutine so we can listen for shutdown signals.
+		go func() {
+			log.Printf("starting server on %s", s.Addr)
+			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("server error: %v", err)
+			}
+		}()
+
+		// Monitor healthcheck failures and trigger shutdown when they occur.
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hc.Failure:
+				log.Printf("healthcheck failure detected, initiating shutdown")
+				stop()
+			}
+		}()
+
+		// Wait for signal
+		<-ctx.Done()
+		log.Printf("shutdown signal received, shutting down server")
+
+		// Allow up to 10 seconds for graceful shutdown
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.Shutdown(shutdownCtx); err != nil {
+			log.Printf("server shutdown error: %v", err)
+		} else {
+			log.Printf("server stopped")
+		}
 	},
+}
+
+// requestHandler returns an http.HandlerFunc that publishes incoming requests
+// using the provided publisher. The publisher is expected to implement
+// Publish(http.Request) error.
+func requestHandler(pub interface{ Publish(http.Request) error }) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Received request at: %s", r.URL.Path)
+
+		if err := pub.Publish(*r); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
