@@ -105,7 +105,7 @@ var transmitterCmd = &cobra.Command{
 			}
 		}
 
-		hc := messaging.NewHealthChecker(viper.GetString("amqp"), instanceID, 5*time.Second, 10*time.Second)
+		hc := messaging.NewHealthChecker(viper.GetString("amqp"), instanceID, 1*time.Second, 2*time.Second)
 		defer hc.Stop()
 
 		// Process messages until the channel closes or we receive a shutdown signal
