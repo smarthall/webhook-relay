@@ -12,7 +12,7 @@ type Subscriber struct {
 	q    amqp.Queue
 }
 
-func NewSubscriber(amqpUri string, key string) *Subscriber {
+func NewSubscriber(amqpUri string, key string, queueName string) *Subscriber {
 	if err := InitConnections(amqpUri); err != nil {
 		log.Panicf("Failed to initialize RabbitMQ connections: %s", err)
 	}
@@ -40,14 +40,26 @@ func NewSubscriber(amqpUri string, key string) *Subscriber {
 		log.Panicf("Failed to declare exchange: %s", err)
 	}
 
-	q, err := ch.QueueDeclare(
-		"",    // name
-		false, // durable
-		false, // delete when unused
-		true,  // exclusive
-		false, // no-wait
-		nil,   // arguments
-	)
+	var q amqp.Queue
+	if queueName != "" {
+		q, err = ch.QueueDeclare(
+			queueName, // name
+			true,      // durable
+			false,     // delete when unused
+			false,     // exclusive
+			false,     // no-wait
+			nil,       // arguments
+		)
+	} else {
+		q, err = ch.QueueDeclare(
+			"",    // name
+			false, // durable
+			false, // delete when unused
+			true,  // exclusive
+			false, // no-wait
+			nil,   // arguments
+		)
+	}
 	if err != nil {
 		log.Panicf("Failed to declare queue: %s", err)
 	}
