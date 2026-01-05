@@ -80,12 +80,20 @@ var receiverCmd = &cobra.Command{
 
 // requestHandler returns an http.HandlerFunc that publishes incoming requests
 // using the provided publisher. The publisher is expected to implement
-// Publish(http.Request) error.
-func requestHandler(pub interface{ Publish(http.Request) error }) http.HandlerFunc {
+// Publish(messaging.RequestMessage) error.
+func requestHandler(pub interface {
+	Publish(messaging.RequestMessage) error
+}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request at: %s", r.URL.Path)
 
-		if err := pub.Publish(*r); err != nil {
+		var msg messaging.RequestMessage
+		if err := msg.FromHTTPRequest(r); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if err := pub.Publish(msg); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}

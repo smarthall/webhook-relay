@@ -3,9 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
@@ -53,30 +51,16 @@ func NewPublisher(amqpUri string) *Publisher {
 	}
 }
 
-func (p *Publisher) Publish(request http.Request) error {
+func (p *Publisher) Publish(msg RequestMessage) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-
-	body, err := io.ReadAll(request.Body)
-	if err != nil {
-		return err
-	}
-
-	// TODO This should be a method on RequestMessage
-	msg := RequestMessage{
-		Method:  request.Method,
-		Host:    request.Host,
-		Path:    request.URL.Path,
-		Headers: request.Header,
-		Body:    string(body),
-	}
 
 	json, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
 
-	routingKey := strings.Trim(strings.Replace(request.URL.Path, "/", ".", -1), ".")
+	routingKey := strings.Trim(strings.Replace(msg.Path, "/", ".", -1), ".")
 	err = p.ch.PublishWithContext(ctx,
 		"webhooks", // exchange
 		routingKey, // routing key

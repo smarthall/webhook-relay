@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -48,14 +47,9 @@ func processDelivery(msg amqp.Delivery, client *http.Client, sendTo string, extr
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
-	buf := bytes.NewBuffer([]byte(reqmsg.Body))
-	req, err := http.NewRequest(reqmsg.Method, sendTo, buf)
+	req, err := reqmsg.ToHTTPRequest(sendTo)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	for k, v := range reqmsg.Headers {
-		req.Header[k] = v
 	}
 
 	if extraHeaders {
